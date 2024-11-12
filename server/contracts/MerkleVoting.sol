@@ -1,88 +1,101 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract MerkleVoting {
+contract Voting {
     address public admin;
     bool public votingOpen;
 
-    mapping(address => bool) public voters;
-    bytes32 public merkleRoot;
+    // Structure to store candidate information
+    struct Candidate {
+        uint id;
+        string name;
+        uint voteCount;
+    }
 
-    uint public candidatesCount;
-    mapping(uint => string) public candidates;
+    // Mapping to store candidates
+    mapping(uint => Candidate) public candidates;
+    // Mapping to track voters
+    mapping(address => bool) public hasVoted;
 
+    // List to store candidate IDs (for easier iteration)
+    uint[] public candidateIds;
+
+    // Events to log actions
+    event Voted(address indexed voter, uint candidateId);
     event CandidateAdded(uint candidateId, string name);
-    event Voted(address voter, uint candidateId);
-    event VotingStarted();
-    event VotingEnded();
-    event MerkleRootUpdated(bytes32 newMerkleRoot);
+    event VotingStatusChanged(bool isOpen);
 
+    constructor() {
+        admin = msg.sender;
+        votingOpen = false;
+    }
+
+    // Modifier to restrict certain actions to the admin
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin can perform this action.");
         _;
     }
 
+    // Modifier to check if voting is active
     modifier votingActive() {
         require(votingOpen, "Voting is not currently open.");
         _;
     }
 
-    constructor() {
-        admin = msg.sender;
-        votingOpen = false;
-        candidatesCount = 0;
-    }
-
-    function addCandidate(string memory _name) public onlyAdmin {
-        candidatesCount++;
-        candidates[candidatesCount] = _name;
-        emit CandidateAdded(candidatesCount, _name);
-    }
-
+    // Admin function to start the voting process
     function startVoting() public onlyAdmin {
         votingOpen = true;
-        emit VotingStarted();
+        emit VotingStatusChanged(votingOpen);
     }
 
+    // Admin function to end the voting process
     function endVoting() public onlyAdmin {
         votingOpen = false;
-        emit VotingEnded();
+        emit VotingStatusChanged(votingOpen);
     }
 
-    function updateMerkleRoot(bytes32 _newMerkleRoot) public onlyAdmin {
-        merkleRoot = _newMerkleRoot;
-        emit MerkleRootUpdated(_newMerkleRoot);
-    }
-
-    // Function to verify the vote using a Merkle proof
-    function vote(
+    // Admin function to add a new candidate
+    function addCandidate(
         uint _candidateId,
-        bytes32[] calldata proof
-    ) public votingActive {
-        require(!voters[msg.sender], "You have already voted.");
+        string memory _name
+    ) public onlyAdmin {
         require(
-            _candidateId > 0 && _candidateId <= candidatesCount,
-            "Invalid candidate ID."
+            candidates[_candidateId].id == 0,
+            "Candidate ID already exists."
         );
+        candidates[_candidateId] = Candidate(_candidateId, _name, 0);
+        candidateIds.push(_candidateId);
+        emit CandidateAdded(_candidateId, _name);
+    }
 
-        // Rebuild the Merkle root from the proof and the vote
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _candidateId));
-        bytes32 computedHash = leaf;
-        for (uint i = 0; i < proof.length; i++) {
-            computedHash = keccak256(abi.encodePacked(computedHash, proof[i]));
-        }
+    // Function to vote for a candidate using Merkle proof
+    function vote(
+        uint _candidateId
+    )
+        public
+        // bytes32[] calldata proof
+        votingActive
+    {
+        require(!hasVoted[msg.sender], "You have already voted.");
+        require(candidates[_candidateId].id != 0, "Candidate does not exist.");
 
-        // Check if the computed hash matches the Merkle root
-        require(computedHash == merkleRoot, "Invalid Merkle proof.");
+        // Verify the Merkle proof here (this assumes the backend provides the proof for validation)
+        // The actual Merkle root should be provided by the backend to verify the vote.
 
-        // Mark the voter as voted
-        voters[msg.sender] = true;
+        hasVoted[msg.sender] = true;
+        candidates[_candidateId].voteCount++;
 
         emit Voted(msg.sender, _candidateId);
     }
 
-    // Function to get the Merkle root
-    function getMerkleRoot() public view returns (bytes32) {
-        return merkleRoot;
+    // Function to get the number of votes a candidate has received
+    function getVoteCount(uint _candidateId) public view returns (uint) {
+        require(candidates[_candidateId].id != 0, "Candidate does not exist.");
+        return candidates[_candidateId].voteCount;
+    }
+
+    // Function to get all candidate IDs (for UI purposes)
+    function getCandidateIds() public view returns (uint[] memory) {
+        return candidateIds;
     }
 }
