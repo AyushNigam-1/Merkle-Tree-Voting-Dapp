@@ -58,7 +58,83 @@ app.get('/candidateVotes/:candidateId', async (req, res) => {
     const votes = await contract.getCandidateVotes(candidateId);
     res.send({ candidateId, votes });
 });
+app.post('/registerCandidate', async (req, res) => {
+    try {
+        const { name } = req.body;
+        const tx = await contract.addCandidate(name);
+        await tx.wait();
+        res.status(200).send({ message: 'Candidate registered successfully.' });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
 
+// Open voting (Admin only)
+app.post('/openVoting', async (req, res) => {
+    try {
+        const tx = await contract.startVoting();
+        await tx.wait();
+        res.status(200).send({ message: 'Voting opened.' });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Close voting (Admin only)
+app.post('/closeVoting', async (req, res) => {
+    try {
+        const tx = await contract.endVoting();
+        await tx.wait();
+        res.status(200).send({ message: 'Voting closed.' });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Cast a vote
+app.post('/castVote', async (req, res) => {
+    try {
+        const { candidateId } = req.body;
+        const tx = await contract.vote(candidateId);
+        await tx.wait();
+        res.status(200).send({ message: `Vote cast for candidate ${candidateId}.` });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Get the list of candidates
+app.get('/listCandidates', async (req, res) => {
+    try {
+        const candidates = [];
+        const candidatesCount = await contract.candidatesCount();
+        for (let i = 1; i <= candidatesCount; i++) {
+            const candidate = await contract.candidates(i);
+            candidates.push({
+                id: candidate.id.toNumber(),
+                name: candidate.name,
+                voteCount: candidate.voteCount.toNumber()
+            });
+        }
+        res.status(200).send({ candidates });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Get the current leader
+app.get('/currentLeader', async (req, res) => {
+    try {
+        const [leaderId, leaderName, leaderVoteCount] = await contract.getWinner();
+        res.status(200).send({
+            leaderId: leaderId.toNumber(),
+            leaderName,
+            leaderVoteCount: leaderVoteCount.toNumber()
+        });
+    } catch (error) {
+        res.status(500).send({ error: error.message });
+    }
+});
 app.listen(3000, () => {
     console.log('Server running on port 3000');
 });
