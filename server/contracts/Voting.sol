@@ -14,7 +14,6 @@ contract Voting {
     }
 
     address public admin;
-    bool public votingOpen;
 
     mapping(address => Voter) public voters;
     mapping(uint => Candidate) public candidates;
@@ -22,22 +21,14 @@ contract Voting {
 
     event CandidateAdded(uint candidateId, string name);
     event Voted(address voter, uint candidateId);
-    event VotingStarted();
-    event VotingEnded();
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin can perform this action.");
         _;
     }
 
-    modifier votingActive() {
-        require(votingOpen, "Voting is not currently open.");
-        _;
-    }
-
     constructor() {
         admin = msg.sender;
-        votingOpen = false;
     }
 
     function addCandidate(string memory _name) public onlyAdmin {
@@ -46,17 +37,7 @@ contract Voting {
         emit CandidateAdded(candidatesCount, _name);
     }
 
-    function startVoting() public onlyAdmin {
-        votingOpen = true;
-        emit VotingStarted();
-    }
-
-    function endVoting() public onlyAdmin {
-        votingOpen = false;
-        emit VotingEnded();
-    }
-
-    function vote(uint _candidateId) public votingActive {
+    function vote(uint _candidateId) public {
         require(!voters[msg.sender].hasVoted, "You have already voted.");
         require(
             _candidateId > 0 && _candidateId <= candidatesCount,
