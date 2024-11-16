@@ -79,4 +79,12 @@ contract MerkleVoting {
     function getCandidateIds() public view returns (uint[] memory) {
         return candidateIds;
     }
+
+    function getAllCandidates() public view returns (Candidate[] memory) {
+        Candidate[] memory allCandidates = new Candidate[](candidateIds.length);
+        for (uint i = 0; i < candidateIds.length; i++) {
+            allCandidates[i] = candidates[candidateIds[i]];
+        }
+        return allCandidates;
+    }
 }

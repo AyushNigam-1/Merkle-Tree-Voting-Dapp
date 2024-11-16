@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 const App = () => {
@@ -8,9 +8,14 @@ const App = () => {
   const [candidateIdv2, setCandidateIdv2] = useState("");
 
   const getCandidates = async () => {
-    const candidates = await axios.get("http://localhost:3000/api/")
-  }
+    const candidatesV1 = await axios.get("http://localhost:3000/merklevoting/get-candidates-v1")
+    const candidatesV2 = await axios.get("http://localhost:3000/voting/get-candidates-v2")
 
+    console.log(candidatesV1, candidatesV2)
+  }
+  useEffect(() => {
+    getCandidates()
+  }, [])
   const handleSubmitV1 = async (event) => {
     event.preventDefault();
     try {

@@ -50,4 +50,38 @@ router.get('/get-vote-count/:candidateId-v2', async (req, res) => {
     }
 });
 
+router.get('/get-candidates-v2', async (req, res) => {
+    try {
+        const startTime = Date.now(); // Start the timer
+
+        // Fetch candidates
+        const candidates = await contract.getAllCandidates();
+
+        // Format candidates for readability
+        const formattedCandidates = candidates.map(candidate => ({
+            id: candidate.id.toString(),
+            name: candidate.name,
+            voteCount: candidate.voteCount.toString(),
+        }));
+
+        const endTime = Date.now(); // End the timer
+        const timeTaken = endTime - startTime; // Calculate time taken in milliseconds
+
+        // Fetch the latest block to get block size
+        const block = await provider.getBlock("latest");
+
+        // Send response
+        res.json({
+            success: true,
+            candidates: formattedCandidates,
+            blockSize: block.size, // Size of the block in bytes
+            gasUsed: block.gasUsed.toString(), // Total gas used in the block
+            timeTaken: `${timeTaken} ms`, // Time taken in milliseconds
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;

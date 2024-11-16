@@ -31,13 +31,35 @@ router.post('/add-candidate-v1', async (req, res) => {
 router.post('/vote-v1', async (req, res) => {
     const { candidateId, voterAddress } = req.body;
     try {
+        const startTime = Date.now(); // Start the timer
+
+        // Initiate the vote transaction
         const tx = await contract.vote(candidateId, { from: voterAddress });
+
+        // Wait for the transaction to be mined
         const receipt = await tx.wait();
-        res.json({ success: true, transactionHash: receipt.transactionHash });
+
+        const endTime = Date.now(); // End the timer
+        const timeTaken = endTime - startTime; // Calculate time taken in milliseconds
+
+        // Fetch the block details to get block size
+        const block = await provider.getBlock(receipt.blockNumber);
+
+        // Prepare and send response
+        res.json({
+            success: true,
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(), // Gas used for the transaction
+            blockSize: block.size, // Size of the block in bytes
+            timeTaken: `${timeTaken} ms` // Time taken in milliseconds
+        });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 
 router.get('/get-winner-v1', async (req, res) => {
@@ -49,4 +71,18 @@ router.get('/get-winner-v1', async (req, res) => {
     }
 });
 
+router.get('/get-candidates-v1', async (req, res) => {
+    try {
+        const candidates = await contract.getAllCandidates();
+        const formattedCandidates = candidates.map(candidate => ({
+            id: candidate.id.toString(),
+            name: candidate.name,
+            voteCount: candidate.voteCount.toString(),
+        }));
+
+        res.json({ success: true, candidates: formattedCandidates });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 module.exports = router;
