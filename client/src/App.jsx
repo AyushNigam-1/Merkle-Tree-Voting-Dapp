@@ -8,10 +8,10 @@ const App = () => {
   const [candidateIdv2, setCandidateIdv2] = useState("");
 
   const getCandidates = async () => {
-    const candidatesV1 = await axios.get("http://localhost:3000/merklevoting/get-candidates-v1")
-    const candidatesV2 = await axios.get("http://localhost:3000/voting/get-candidates-v2")
-
-    console.log(candidatesV1, candidatesV2)
+    const candidatesV1 = await axios.get("http://localhost:3000/v1/get-candidates-v1")
+    const candidatesV2 = await axios.get("http://localhost:3000/v2/get-candidates-v2")
+    setCandidateIdv1(candidatesV1.data.formattedCandidates[0].id)
+    setCandidateIdv2(candidatesV2.data.formattedCandidates[0].id)
   }
   useEffect(() => {
     getCandidates()
@@ -19,8 +19,7 @@ const App = () => {
   const handleSubmitV1 = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post("http://localhost:3000/api/vote-v1", {
-        voter: voterAddressv1,
+      const response = await axios.post("http://localhost:3000/v1/vote-v1", {
         candidateId: candidateIdv1
       });
       console.log("Vote submitted:", response.data);
@@ -31,8 +30,8 @@ const App = () => {
   const handleSubmitV2 = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post("http://localhost:3000/api/vote-v2", {
-        voter: voterAddressv2,
+      const response = await axios.post("http://localhost:3000/v2/vote-v2", {
+        candidateId: candidateIdv2
       });
       console.log("Vote submitted:", response.data);
     } catch (error) {
@@ -43,15 +42,6 @@ const App = () => {
     <div style={{ height: "100vh", width: "100vw", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
       <form onSubmit={handleSubmitV1} style={{ display: 'flex', flexDirection: 'column', gap: '4px', }}>
         <h1>Vote for Your Candidate - V1 - Ordinary Contract</h1>
-        <label>
-          Voter Address:
-          <input
-            type="text"
-            value={voterAddressv1}
-            onChange={(e) => setVoterAddressv1(e.target.value)}
-          />
-        </label>
-        <br />
         <label>
           Candidate ID:
           <input
@@ -65,15 +55,6 @@ const App = () => {
       </form>
       <form onSubmit={handleSubmitV2} style={{ display: 'flex', flexDirection: 'column', gap: '4px', }}>
         <h1>Vote for Your Candidate - V1 - Merkle Tree Contract</h1>
-        <label>
-          Voter Address:
-          <input
-            type="text"
-            value={voterAddressv2}
-            onChange={(e) => setVoterAddressv2(e.target.value)}
-          />
-        </label>
-        <br />
         <label>
           Candidate ID:
           <input

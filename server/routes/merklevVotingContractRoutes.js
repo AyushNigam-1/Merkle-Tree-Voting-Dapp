@@ -1,76 +1,121 @@
-const express = require('express');
-const { ethers } = require('ethers');
-const router = express.Router();
+const express = require("express");
+const { ethers } = require("ethers");
+const { MerkleTree } = require("merkletreejs");
+const { keccak256, defaultAbiCoder } = ethers;
 const { abi } = require("../artifacts/contracts/MerkleVoting.sol/MerkleVoting.json")
 
-const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545');
-const adminPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+// Set up Express router
+const router = express();
+// Ethers setup (change to your provider URL, like Infura, Alchemy, or local Ganache)
+const provider = new ethers.JsonRpcProvider("http://localhost:8545"); // Change to your provider
+const adminPrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // Admin private key to sign transactions
 const wallet = new ethers.Wallet(adminPrivateKey, provider);
-const contractAddress = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+
+// Contract setup
+const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";  // Deployed contract address
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
+// Middleware
 
-router.use((req, res, next) => {
-    console.log(`Request Method: ${req.method}, Request URL: ${req.originalUrl}`);
-    next();
+// In-memory storage for simplicity (you could use a database here)
+let voters = []; // List of voters (for Merkle tree)
+let candidates = []; // List of candidates for Merkle tree
+
+// Merkle Tree Setup
+let merkleTree = new MerkleTree([], keccak256);
+let merkleRoot = merkleTree.getRoot().toString("hex");
+
+const adminAddress = wallet.address; // Admin address
+
+// Fetch current Merkle root
+router.get("/merkle-root", (req, res) => {
+    res.json({ merkleRoot });
 });
 
-
-router.post('/add-candidate-v1', async (req, res) => {
+// Add a candidate (admin only)
+router.post("/add-candidate", async (req, res) => {
     const { name } = req.body;
-    try {
-        const tx = await contract.addCandidate(name);
-        const receipt = await tx.wait();
-        res.json({ success: true, transactionHash: receipt.transactionHash });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+
+    if (req.body.admin !== adminAddress) {
+        return res.status(403).json({ error: "Only admin can add candidates." });
     }
-});
 
-
-router.post('/vote-v1', async (req, res) => {
-    const { candidateId, voterAddress } = req.body;
     try {
-        const startTime = Date.now(); // Start the timer
+        // Interact with the contract to add a candidate
+        const tx = await contract.addCandidate(name);
+        await tx.wait(); // Wait for the transaction to be mined
 
-        // Initiate the vote transaction
-        const tx = await contract.vote(candidateId, { from: voterAddress });
+        candidates.push(name); // Add to our local list for Merkle Tree
+        voters.push(name); // Adding candidate to voters list for proof
+        merkleTree = new MerkleTree(voters.map(voter => keccak256(voter)), keccak256);
+        merkleRoot = merkleTree.getRoot().toString("hex");
 
-        // Wait for the transaction to be mined
-        const receipt = await tx.wait();
-
-        const endTime = Date.now(); // End the timer
-        const timeTaken = endTime - startTime; // Calculate time taken in milliseconds
-
-        // Fetch the block details to get block size
-        const block = await provider.getBlock(receipt.blockNumber);
-
-        // Prepare and send response
-        res.json({
-            success: true,
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
-            gasUsed: receipt.gasUsed.toString(), // Gas used for the transaction
-            blockSize: block.size, // Size of the block in bytes
-            timeTaken: `${timeTaken} ms` // Time taken in milliseconds
-        });
+        res.json({ message: `Candidate '${name}' added successfully.` });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ error: "Failed to add candidate." });
     }
 });
 
+// Update the Merkle root (admin only)
+router.post("/update-merkle-root", async (req, res) => {
+    const { newMerkleRoot, admin } = req.body;
 
+    if (admin !== adminAddress) {
+        return res.status(403).json({ error: "Only admin can update Merkle root." });
+    }
 
-router.get('/get-winner-v1', async (req, res) => {
     try {
-        const { winnerId, winnerName, winnerVoteCount } = await contract.getWinner();
-        res.json({ winnerId, winnerName, winnerVoteCount });
+        // Update the contract's Merkle root
+        const tx = await contract.updateMerkleRoot(newMerkleRoot);
+        await tx.wait(); // Wait for the transaction to be mined
+
+        merkleRoot = newMerkleRoot; // Update local Merkle root
+        res.json({ message: "Merkle root updated successfully." });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
+        console.error(error);
+        res.status(500).json({ error: "Failed to update Merkle root." });
     }
 });
 
+// Cast a vote (with Merkle proof)
+
+router.post("/vote-v1", async (req, res) => {
+    const { candidateId, voter, merkleProof } = req.body;
+
+    try {
+        // Verify Merkle proof off-chain using keccak256
+        const leaf = keccak256(defaultAbiCoder(["address"], [voter]));  // Encode voter address
+        const isValidProof = merkleTree.verify(merkleProof, leaf, merkleRoot);
+
+        if (!isValidProof) {
+            return res.status(400).json({ error: "Invalid Merkle proof." });
+        }
+
+        // Interact with the contract to vote for the candidate
+        const tx = await contract.vote(candidateId, merkleProof);
+        await tx.wait(); // Wait for the transaction to be mined
+
+        res.json({ message: `Vote casted successfully for candidate ${candidateId}.` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to cast vote." });
+    }
+});
+
+
+// Fetch candidate vote counts
+router.get("/candidate-votes/:candidateId", async (req, res) => {
+    const { candidateId } = req.params;
+
+    try {
+        const voteCount = await contract.getVoteCount(candidateId);
+        res.json({ candidateId, voteCount });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to get vote count." });
+    }
+});
 router.get('/get-candidates-v1', async (req, res) => {
     try {
         const candidates = await contract.getAllCandidates();
@@ -79,10 +124,11 @@ router.get('/get-candidates-v1', async (req, res) => {
             name: candidate.name,
             voteCount: candidate.voteCount.toString(),
         }));
-
-        res.json({ success: true, candidates: formattedCandidates });
+        console.log(formattedCandidates)
+        res.json({ formattedCandidates });
     } catch (error) {
+        console.log(error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
-module.exports = router;
+module.exports = router

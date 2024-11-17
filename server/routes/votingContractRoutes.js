@@ -29,15 +29,40 @@ router.post('/add-candidate-v2', async (req, res) => {
 
 
 router.post('/vote-v2', async (req, res) => {
-    const { candidateId, voterAddress } = req.body;
+    console.log("Vote API called");
+    const { candidateId } = req.body;
+
     try {
-        const tx = await contract.vote(candidateId, { from: voterAddress });
-        const receipt = await tx.wait();
-        res.json({ success: true, transactionHash: receipt.transactionHash });
+        const startTime = Date.now(); // Start the timer
+
+        // Sending the transaction
+        const tx = await contract.vote(candidateId, { from: wallet.address });
+        const receipt = await tx.wait(); // Wait for the transaction to be mined
+
+        const endTime = Date.now(); // End the timer
+        const timeTaken = endTime - startTime; // Time taken in milliseconds
+
+        // Fetch the block containing the transaction
+        const block = await provider.getBlock(receipt.blockNumber);
+
+        // Calculate block size
+        const blockSize = Buffer.byteLength(JSON.stringify(block));
+
+        // Send response
+        res.json({
+            success: true,
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber,
+            gasUsed: receipt.gasUsed.toString(), // Gas used in the transaction
+            blockSize: `${blockSize}`, // Block size in bytes
+            timeTaken: `${timeTaken}`, // Total time taken
+        });
     } catch (error) {
+        console.error(error); // Log the error details
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 
 router.get('/get-vote-count/:candidateId-v2', async (req, res) => {
@@ -52,32 +77,14 @@ router.get('/get-vote-count/:candidateId-v2', async (req, res) => {
 
 router.get('/get-candidates-v2', async (req, res) => {
     try {
-        const startTime = Date.now(); // Start the timer
-
-        // Fetch candidates
         const candidates = await contract.getAllCandidates();
-
-        // Format candidates for readability
         const formattedCandidates = candidates.map(candidate => ({
             id: candidate.id.toString(),
             name: candidate.name,
             voteCount: candidate.voteCount.toString(),
         }));
-
-        const endTime = Date.now(); // End the timer
-        const timeTaken = endTime - startTime; // Calculate time taken in milliseconds
-
-        // Fetch the latest block to get block size
-        const block = await provider.getBlock("latest");
-
-        // Send response
-        res.json({
-            success: true,
-            candidates: formattedCandidates,
-            blockSize: block.size, // Size of the block in bytes
-            gasUsed: block.gasUsed.toString(), // Total gas used in the block
-            timeTaken: `${timeTaken} ms`, // Time taken in milliseconds
-        });
+        console.log(formattedCandidates)
+        res.json({ formattedCandidates });
     } catch (error) {
         console.log(error);
         res.status(500).json({ success: false, error: error.message });
