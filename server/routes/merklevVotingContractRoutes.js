@@ -1,9 +1,11 @@
 const express = require("express");
 const { ethers } = require("ethers");
 const { MerkleTree } = require("merkletreejs");
-const { keccak256, defaultAbiCoder } = ethers;
 const { abi } = require("../artifacts/contracts/MerkleVoting.sol/MerkleVoting.json")
+const { toHex } = require("web3-utils");
+const keccak = require('keccak');  // Import the keccak module correctly
 
+// const abiCoder = new AbiCoder();
 // Set up Express router
 const router = express();
 // Ethers setup (change to your provider URL, like Infura, Alchemy, or local Ganache)
@@ -22,7 +24,7 @@ let voters = []; // List of voters (for Merkle tree)
 let candidates = []; // List of candidates for Merkle tree
 
 // Merkle Tree Setup
-let merkleTree = new MerkleTree([], keccak256);
+let merkleTree = new MerkleTree([], (value) => keccak("keccak256").update(value).digest());
 let merkleRoot = merkleTree.getRoot().toString("hex");
 
 const adminAddress = wallet.address; // Admin address
@@ -57,6 +59,10 @@ router.post("/add-candidate", async (req, res) => {
     }
 });
 
+const keecackHash = (data) => {
+    return keccak('keccak256').update(data).digest('hex')
+}
+
 // Update the Merkle root (admin only)
 router.post("/update-merkle-root", async (req, res) => {
     const { newMerkleRoot, admin } = req.body;
@@ -80,12 +86,32 @@ router.post("/update-merkle-root", async (req, res) => {
 
 // Cast a vote (with Merkle proof)
 
+// const keccak = require('keccak'); // Make sure to import correctly
+
 router.post("/vote-v1", async (req, res) => {
-    const { candidateId, voter, merkleProof } = req.body;
+    const { candidateId } = req.body;
 
     try {
-        // Verify Merkle proof off-chain using keccak256
-        const leaf = keccak256(defaultAbiCoder(["address"], [voter]));  // Encode voter address
+        // Voter address (wallet address)
+        const encodedVoter = wallet.address.replace(/^0x/, '');  // Ensure format matches tree leaves
+        const leaf = keccak('keccak256').update(encodedVoter).digest("hex");
+
+        // If the voter is not in the list, add them to the list and update the Merkle tree
+        if (!voters.includes(encodedVoter)) {
+            voters.push(encodedVoter);  // Add the voter address to the list
+
+            // Ensure keccak is used properly as the hashing function
+            const leafNodes = voters.map(voter => keccak('keccak256').update(voter).digest('hex'));
+
+            // Pass the keccak function as the first argument to MerkleTree
+            merkleTree = new MerkleTree(leafNodes, keecackHash);  // Correct way to pass hash function
+            merkleRoot = merkleTree.getRoot().toString("hex");  // Get the updated root
+        }
+
+        // Generate Merkle proof for the voter
+        const merkleProof = merkleTree.getProof(leaf);
+
+        // Verify the proof
         const isValidProof = merkleTree.verify(merkleProof, leaf, merkleRoot);
 
         if (!isValidProof) {
@@ -94,7 +120,7 @@ router.post("/vote-v1", async (req, res) => {
 
         // Interact with the contract to vote for the candidate
         const tx = await contract.vote(candidateId, merkleProof);
-        await tx.wait(); // Wait for the transaction to be mined
+        await tx.wait();  // Wait for the transaction to be mined
 
         res.json({ message: `Vote casted successfully for candidate ${candidateId}.` });
     } catch (error) {
@@ -102,6 +128,7 @@ router.post("/vote-v1", async (req, res) => {
         res.status(500).json({ error: "Failed to cast vote." });
     }
 });
+
 
 
 // Fetch candidate vote counts
