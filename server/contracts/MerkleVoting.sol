@@ -40,33 +40,37 @@ contract MerkleVoting {
     }
 
     // Function to vote for a candidate using Merkle proof
-    function vote(uint candidateId, bytes32[] calldata merkleProof) public {
+    function vote(
+        uint candidateId,
+        bytes32[] calldata merkleProof,
+        bytes32 newMerkleRoot
+    ) public {
         require(!hasVoted[msg.sender], "You have already voted.");
         require(candidates[candidateId].id != 0, "Candidate does not exist.");
         require(
-            verifyMerkleProof(merkleProof, msg.sender),
+            verifyMerkleProof(merkleProof, msg.sender, newMerkleRoot),
             "Invalid Merkle proof."
         );
 
+        // Mark the voter as having voted and increase the candidate's vote count
         hasVoted[msg.sender] = true;
         candidates[candidateId].voteCount++;
+
+        // Update the Merkle root
+        merkleRoot = newMerkleRoot;
+        emit MerkleRootUpdated(newMerkleRoot);
 
         emit Voted(msg.sender, candidateId);
     }
 
-    // Function to verify Merkle proof
+    // Function to verify Merkle proof using the new Merkle root
     function verifyMerkleProof(
         bytes32[] calldata merkleProof,
-        address voter
-    ) internal view returns (bool) {
+        address voter,
+        bytes32 newRoot
+    ) internal pure returns (bool) {
         bytes32 leaf = keccak256(abi.encodePacked(voter));
-        return MerkleProof.verify(merkleProof, merkleRoot, leaf);
-    }
-
-    // Admin function to update the Merkle root
-    function updateMerkleRoot(bytes32 newMerkleRoot) public onlyAdmin {
-        merkleRoot = newMerkleRoot;
-        emit MerkleRootUpdated(newMerkleRoot);
+        return MerkleProof.verify(merkleProof, newRoot, leaf);
     }
 
     // Function to get the vote count for a candidate

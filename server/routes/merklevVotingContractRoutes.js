@@ -93,34 +93,34 @@ router.post("/vote-v1", async (req, res) => {
 
     try {
         // Voter address (wallet address)
-        const encodedVoter = wallet.address.replace(/^0x/, '');  // Ensure format matches tree leaves
-        const leaf = keccak('keccak256').update(encodedVoter).digest("hex");
+        const encodedVoter = wallet.address.replace(/^0x/, '');
+        const leaf = Buffer.from(keccak('keccak256').update(encodedVoter).digest("hex"), "hex");
 
         // If the voter is not in the list, add them to the list and update the Merkle tree
         if (!voters.includes(encodedVoter)) {
-            voters.push(encodedVoter);  // Add the voter address to the list
+            voters.push(encodedVoter);
 
-            // Ensure keccak is used properly as the hashing function
-            const leafNodes = voters.map(voter => keccak('keccak256').update(voter).digest('hex'));
+            const leafNodes = voters.map(voter =>
+                Buffer.from(keccak('keccak256').update(voter).digest("hex"), "hex")
+            );
 
-            // Pass the keccak function as the first argument to MerkleTree
-            merkleTree = new MerkleTree(leafNodes, keecackHash);  // Correct way to pass hash function
-            merkleRoot = merkleTree.getRoot().toString("hex");  // Get the updated root
+            merkleTree = new MerkleTree(leafNodes, keecackHash);
+            merkleRoot = `0x${merkleTree.getRoot().toString("hex")}`; // Add '0x' prefix
         }
 
-        // Generate Merkle proof for the voter
-        const merkleProof = merkleTree.getProof(leaf);
+        // Generate Merkle proof (formatted as an array of hex strings prefixed by '0x')
+        const merkleProof = merkleTree.getProof(leaf).map(p => `0x${p.data.toString("hex")}`);
 
         // Verify the proof
-        const isValidProof = merkleTree.verify(merkleProof, leaf, merkleRoot);
+        const isValidProof = merkleTree.verify(merkleProof.map(p => Buffer.from(p.slice(2), "hex")), leaf, Buffer.from(merkleRoot.slice(2), "hex"));
 
         if (!isValidProof) {
             return res.status(400).json({ error: "Invalid Merkle proof." });
         }
 
         // Interact with the contract to vote for the candidate
-        const tx = await contract.vote(candidateId, merkleProof);
-        await tx.wait();  // Wait for the transaction to be mined
+        const tx = await contract.vote(candidateId, merkleProof, merkleRoot);
+        await tx.wait(); // Wait for the transaction to be mined
 
         res.json({ message: `Vote casted successfully for candidate ${candidateId}.` });
     } catch (error) {
@@ -128,6 +128,7 @@ router.post("/vote-v1", async (req, res) => {
         res.status(500).json({ error: "Failed to cast vote." });
     }
 });
+
 
 
 

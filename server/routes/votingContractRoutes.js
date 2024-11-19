@@ -54,8 +54,8 @@ router.post('/vote-v2', async (req, res) => {
             transactionHash: receipt.transactionHash,
             blockNumber: receipt.blockNumber,
             gasUsed: receipt.gasUsed.toString(), // Gas used in the transaction
-            blockSize: `${blockSize}`, // Block size in bytes
-            timeTaken: `${timeTaken}`, // Total time taken
+            blockSize, // Block size in bytes
+            timeTaken, // Total time taken
         });
     } catch (error) {
         console.error(error); // Log the error details
