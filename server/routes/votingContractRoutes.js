@@ -50,9 +50,6 @@ router.post('/vote-v2', async (req, res) => {
 
         // Send response
         res.json({
-            success: true,
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber,
             gasUsed: receipt.gasUsed.toString(), // Gas used in the transaction
             blockSize, // Block size in bytes
             timeTaken, // Total time taken

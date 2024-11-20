@@ -21,6 +21,12 @@ contract MerkleVoting {
     event Voted(address indexed voter, uint candidateId);
     event CandidateAdded(uint candidateId, string name);
     event MerkleRootUpdated(bytes32 merkleRoot);
+    event DebugMerkleProof(
+        bytes32 leaf,
+        bytes32[] merkleProof,
+        bytes32 newRoot,
+        bool isValidProof
+    );
 
     constructor() {
         admin = msg.sender;
@@ -47,10 +53,18 @@ contract MerkleVoting {
     ) public {
         require(!hasVoted[msg.sender], "You have already voted.");
         require(candidates[candidateId].id != 0, "Candidate does not exist.");
-        require(
-            verifyMerkleProof(merkleProof, msg.sender, newMerkleRoot),
-            "Invalid Merkle proof."
+
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
+        bool isValidProof = MerkleProof.verify(
+            merkleProof,
+            newMerkleRoot,
+            leaf
         );
+
+        // Emit debug event for data compatibility checks
+        emit DebugMerkleProof(leaf, merkleProof, newMerkleRoot, isValidProof);
+
+        require(isValidProof, "Invalid Merkle proof.");
 
         // Mark the voter as having voted and increase the candidate's vote count
         hasVoted[msg.sender] = true;

@@ -2,9 +2,8 @@ const express = require("express");
 const { ethers } = require("ethers");
 const { MerkleTree } = require("merkletreejs");
 const { abi } = require("../artifacts/contracts/MerkleVoting.sol/MerkleVoting.json")
-const { toHex } = require("web3-utils");
 const keccak = require('keccak');  // Import the keccak module correctly
-
+const keccak256 = require("keccak256");
 // const abiCoder = new AbiCoder();
 // Set up Express router
 const router = express();
@@ -84,52 +83,76 @@ router.post("/update-merkle-root", async (req, res) => {
     }
 });
 
-// Cast a vote (with Merkle proof)
-
-// const keccak = require('keccak'); // Make sure to import correctly
 
 router.post("/vote-v1", async (req, res) => {
     const { candidateId } = req.body;
 
     try {
-        // Voter address (wallet address)
-        const encodedVoter = wallet.address.replace(/^0x/, '');
-        const leaf = Buffer.from(keccak('keccak256').update(encodedVoter).digest("hex"), "hex");
+        const startTime = Date.now();
+        // Step 1: Normalize the voter address (wallet address in checksum format)
+        const voterAddress = ethers.getAddress(wallet.address); // Ensure checksum address
 
-        // If the voter is not in the list, add them to the list and update the Merkle tree
-        if (!voters.includes(encodedVoter)) {
-            voters.push(encodedVoter);
+        // Step 2: Encode and hash using `keccak` library to create the leaf node
+        const leaf = `0x${keccak("keccak256")
+            .update(Buffer.from(voterAddress.slice(2), "hex")) // Properly slice and convert address
+            .digest("hex")}`;
 
+        // Step 3: Add voter to the list and rebuild Merkle tree if not already present
+        if (!voters.includes(voterAddress)) {
+            voters.push(voterAddress);
+
+            // Generate leaf nodes for Merkle Tree from the voters array
             const leafNodes = voters.map(voter =>
-                Buffer.from(keccak('keccak256').update(voter).digest("hex"), "hex")
+                `0x${keccak("keccak256")
+                    .update(Buffer.from(voter.slice(2), "hex")) // Generate leaf hash from address
+                    .digest("hex")}`
             );
 
-            merkleTree = new MerkleTree(leafNodes, keecackHash);
-            merkleRoot = `0x${merkleTree.getRoot().toString("hex")}`; // Add '0x' prefix
+            // Build Merkle Tree using sorted pairs
+            merkleTree = new MerkleTree(
+                leafNodes.map(x => Buffer.from(x.slice(2), "hex")), // Convert hex strings back to buffers for Merkle Tree
+                hash => Buffer.from(keccak("keccak256").update(hash).digest()), // Keccak hash function
+                { sortPairs: true }
+            );
+            merkleRoot = `0x${merkleTree.getRoot().toString("hex")}`; // Merkle root as bytes32
         }
 
-        // Generate Merkle proof (formatted as an array of hex strings prefixed by '0x')
-        const merkleProof = merkleTree.getProof(leaf).map(p => `0x${p.data.toString("hex")}`);
+        // Step 4: Generate the Merkle proof for the current voter
+        const proof = merkleTree.getProof(Buffer.from(leaf.slice(2), "hex"));
+        const merkleProof = proof.map(proof => `0x${proof.data.toString("hex")}`); // Hex string array with 0x prefix
 
-        // Verify the proof
-        const isValidProof = merkleTree.verify(merkleProof.map(p => Buffer.from(p.slice(2), "hex")), leaf, Buffer.from(merkleRoot.slice(2), "hex"));
-
-        if (!isValidProof) {
-            return res.status(400).json({ error: "Invalid Merkle proof." });
-        }
-
-        // Interact with the contract to vote for the candidate
+        // Step 5: Interact with the smart contract
         const tx = await contract.vote(candidateId, merkleProof, merkleRoot);
-        await tx.wait(); // Wait for the transaction to be mined
 
-        res.json({ message: `Vote casted successfully for candidate ${candidateId}.` });
+        // Wait for the transaction to be mined and get the receipt
+        const receipt = await tx.wait();
+
+        // Extract details from the transaction receipt
+        const endTime = Date.now(); // End the timer
+        const timeTaken = endTime - startTime; // Time taken in milliseconds
+
+        // Fetch the block containing the transaction
+        const block = await provider.getBlock(receipt.blockNumber);
+
+        // Calculate block size
+        const blockSize = Buffer.byteLength(JSON.stringify(block)); // Block size might not be available in the receipt, handle gracefully
+
+        // Respond with success along with the details
+        res.json({
+            timeTaken,   // Time taken for transaction
+            gasUsed: receipt.gasUsed.toString(),       // Gas used for the transaction
+            blockSize,   // Block size (if available)
+        });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to cast vote." });
+        console.error("Error during voting:", error);
+
+        // Respond with error details for debugging purposes
+        res.status(500).json({
+            error: "Failed to cast vote.",
+            details: error.message || error,
+        });
     }
 });
-
-
 
 
 // Fetch candidate vote counts
