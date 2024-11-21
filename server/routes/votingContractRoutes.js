@@ -2,10 +2,10 @@ const express = require('express');
 const { ethers } = require('ethers');
 const router = express.Router();
 const { abi } = require("../artifacts/contracts/Voting.sol/Voting.json")
+require("dotenv").config()
 
-const provider = new ethers.JsonRpcProvider('http://127.0.0.1:8545')
-const adminPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-const wallet = new ethers.Wallet(adminPrivateKey, provider);
+const provider = new ethers.JsonRpcProvider(process.env.PROVIDER);
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contractAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
@@ -29,63 +29,56 @@ router.post('/add-candidate-v2', async (req, res) => {
 
 
 router.post('/vote-v2', async (req, res) => {
-    console.log("Vote API called");
     const { candidateId } = req.body;
-
     try {
-        const startTime = Date.now(); // Start the timer
-
-        // Sending the transaction
+        const startTime = Date.now();
         const tx = await contract.vote(candidateId, { from: wallet.address });
-        const receipt = await tx.wait(); // Wait for the transaction to be mined
-
-        const endTime = Date.now(); // End the timer
-        const timeTaken = endTime - startTime; // Time taken in milliseconds
-
-        // Fetch the block containing the transaction
+        const receipt = await tx.wait();
+        const voteCastLog = receipt.logs.find(
+            log => log.fragment && log.fragment.name === "VoteCast"
+        );
+        if (!voteCastLog) {
+            throw new Error("VoteCast event not found in logs.");
+        }
+        const { args } = voteCastLog;
+        const updatedCandidate = {
+            id: args[0].toString(),
+            name: args[1],
+            voteCount: args[2].toString(),
+        };
+        const endTime = Date.now();
+        const timeTaken = endTime - startTime;
         const block = await provider.getBlock(receipt.blockNumber);
-
-        // Calculate block size
         const blockSize = Buffer.byteLength(JSON.stringify(block));
-
-        // Send response
         res.json({
-            gasUsed: receipt.gasUsed.toString(), // Gas used in the transaction
-            blockSize, // Block size in bytes
-            timeTaken, // Total time taken
+            gasUsed: receipt.gasUsed.toString(),
+            blockSize,
+            timeTaken,
+            updatedCandidate
         });
     } catch (error) {
-        console.error(error); // Log the error details
+        console.error(error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 
 
-router.get('/get-vote-count/:candidateId-v2', async (req, res) => {
-    const candidateId = req.params.candidateId;
+router.get('/candidates-with-votes', async (req, res) => {
     try {
-        const voteCount = await contract.getVoteCount(candidateId);
-        res.json({ candidateId, voteCount });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.get('/get-candidates-v2', async (req, res) => {
-    try {
-        const candidates = await contract.getAllCandidates();
-        const formattedCandidates = candidates.map(candidate => ({
-            id: candidate.id.toString(),
-            name: candidate.name,
-            voteCount: candidate.voteCount.toString(),
+        const [ids, names, voteCounts] = await contract.getAllCandidatesDetails();
+        const candidatesWithVotes = ids.map((id, index) => ({
+            id: id.toString(),
+            name: names[index],
+            voteCount: voteCounts[index].toString(),
         }));
-        console.log(formattedCandidates)
-        res.json({ formattedCandidates });
+
+        res.json({ candidates: candidatesWithVotes });
     } catch (error) {
-        console.log(error);
+        console.error("Error fetching candidates and votes:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 module.exports = router;

@@ -16,6 +16,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.1.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "ethers": "^6.13.4",
     "express": "^4.21.1",
     "keccak": "^3.0.4",

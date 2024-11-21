@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract MerkleVoting {
     address public admin;
-    bytes32 public merkleRoot; // Root of the Merkle tree
+    bytes32 public merkleRoot;
 
     struct Candidate {
         uint id;
@@ -16,11 +16,13 @@ contract MerkleVoting {
     mapping(uint => Candidate) public candidates;
     mapping(address => bool) public hasVoted;
     uint[] public candidateIds;
-    uint private nextCandidateId = 1; // Tracks the next candidate ID
+    uint private nextCandidateId = 1;
 
     event Voted(address indexed voter, uint candidateId);
     event CandidateAdded(uint candidateId, string name);
     event MerkleRootUpdated(bytes32 merkleRoot);
+    event VoteCast(uint candidateId, string name, uint voteCount);
+
     event DebugMerkleProof(
         bytes32 leaf,
         bytes32[] merkleProof,
@@ -37,7 +39,6 @@ contract MerkleVoting {
         _;
     }
 
-    // Function to add a new candidate
     function addCandidate(string memory name) public onlyAdmin {
         candidates[nextCandidateId] = Candidate(nextCandidateId, name, 0);
         candidateIds.push(nextCandidateId);
@@ -45,7 +46,6 @@ contract MerkleVoting {
         nextCandidateId++;
     }
 
-    // Function to vote for a candidate using Merkle proof
     function vote(
         uint candidateId,
         bytes32[] calldata merkleProof,
@@ -60,24 +60,19 @@ contract MerkleVoting {
             newMerkleRoot,
             leaf
         );
-
-        // Emit debug event for data compatibility checks
-        emit DebugMerkleProof(leaf, merkleProof, newMerkleRoot, isValidProof);
-
         require(isValidProof, "Invalid Merkle proof.");
 
-        // Mark the voter as having voted and increase the candidate's vote count
         hasVoted[msg.sender] = true;
         candidates[candidateId].voteCount++;
 
-        // Update the Merkle root
         merkleRoot = newMerkleRoot;
-        emit MerkleRootUpdated(newMerkleRoot);
-
-        emit Voted(msg.sender, candidateId);
+        emit VoteCast(
+            candidateId,
+            candidates[candidateId].name,
+            candidates[candidateId].voteCount
+        );
     }
 
-    // Function to verify Merkle proof using the new Merkle root
     function verifyMerkleProof(
         bytes32[] calldata merkleProof,
         address voter,
@@ -87,22 +82,21 @@ contract MerkleVoting {
         return MerkleProof.verify(merkleProof, newRoot, leaf);
     }
 
-    // Function to get the vote count for a candidate
-    function getVoteCount(uint candidateId) public view returns (uint) {
-        require(candidates[candidateId].id != 0, "Candidate does not exist.");
-        return candidates[candidateId].voteCount;
-    }
+    function getAllCandidatesDetails()
+        public
+        view
+        returns (uint[] memory, string[] memory, uint[] memory)
+    {
+        uint[] memory ids = new uint[](candidateIds.length);
+        string[] memory names = new string[](candidateIds.length);
+        uint[] memory voteCounts = new uint[](candidateIds.length);
 
-    // Function to get all candidate IDs
-    function getCandidateIds() public view returns (uint[] memory) {
-        return candidateIds;
-    }
-
-    function getAllCandidates() public view returns (Candidate[] memory) {
-        Candidate[] memory allCandidates = new Candidate[](candidateIds.length);
         for (uint i = 0; i < candidateIds.length; i++) {
-            allCandidates[i] = candidates[candidateIds[i]];
+            ids[i] = candidates[candidateIds[i]].id;
+            names[i] = candidates[candidateIds[i]].name;
+            voteCounts[i] = candidates[candidateIds[i]].voteCount;
         }
-        return allCandidates;
+
+        return (ids, names, voteCounts);
     }
 }

@@ -21,6 +21,7 @@ contract Voting {
 
     event CandidateAdded(uint candidateId, string name);
     event Voted(address voter, uint candidateId);
+    event VoteCast(uint candidateId, string name, uint voteCount);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin can perform this action.");
@@ -37,40 +38,38 @@ contract Voting {
         emit CandidateAdded(candidatesCount, _name);
     }
 
-    function vote(uint _candidateId) public {
+    function vote(uint candidateId) public {
         require(!voters[msg.sender].hasVoted, "You have already voted.");
         require(
-            _candidateId > 0 && _candidateId <= candidatesCount,
+            candidateId > 0 && candidateId <= candidatesCount,
             "Invalid candidate ID."
         );
 
-        voters[msg.sender] = Voter(true, _candidateId);
-        candidates[_candidateId].voteCount++;
+        voters[msg.sender] = Voter(true, candidateId);
+        candidates[candidateId].voteCount++;
 
-        emit Voted(msg.sender, _candidateId);
+        emit VoteCast(
+            candidateId,
+            candidates[candidateId].name,
+            candidates[candidateId].voteCount
+        );
     }
 
-    function getWinner()
+    function getAllCandidatesDetails()
         public
         view
-        returns (uint winnerId, string memory winnerName, uint winnerVoteCount)
+        returns (uint[] memory, string[] memory, uint[] memory)
     {
-        uint maxVotes = 0;
-        for (uint i = 1; i <= candidatesCount; i++) {
-            if (candidates[i].voteCount > maxVotes) {
-                maxVotes = candidates[i].voteCount;
-                winnerId = candidates[i].id;
-                winnerName = candidates[i].name;
-                winnerVoteCount = candidates[i].voteCount;
-            }
-        }
-    }
+        uint[] memory ids = new uint[](candidatesCount);
+        string[] memory names = new string[](candidatesCount);
+        uint[] memory voteCounts = new uint[](candidatesCount);
 
-    function getAllCandidates() public view returns (Candidate[] memory) {
-        Candidate[] memory allCandidates = new Candidate[](candidatesCount);
         for (uint i = 1; i <= candidatesCount; i++) {
-            allCandidates[i - 1] = candidates[i];
+            ids[i - 1] = candidates[i].id;
+            names[i - 1] = candidates[i].name;
+            voteCounts[i - 1] = candidates[i].voteCount;
         }
-        return allCandidates;
+
+        return (ids, names, voteCounts);
     }
 }
