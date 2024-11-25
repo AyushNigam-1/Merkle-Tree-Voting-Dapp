@@ -9,29 +9,20 @@ const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
 const contractAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
+function estimateBlockSize(gasUsed, extraDataHex) {
+    const BYTES_PER_GAS_UNIT = 16n;
+    const BLOCK_HEADER_SIZE = 500n;
 
+    const transactionDataSize = gasUsed / BYTES_PER_GAS_UNIT;
+    const extraDataSize = BigInt(extraDataHex.length / 2);
+    const totalBlockSize = BLOCK_HEADER_SIZE + transactionDataSize + extraDataSize;
 
-router.use((req, res, next) => {
-    console.log(`Request Method: ${req.method}, Request URL: ${req.originalUrl}`);
-    next();
-});
-
-router.post('/add-candidate-v2', async (req, res) => {
-    const { candidateId, name } = req.body;
-    try {
-        const tx = await contract.addCandidate(candidateId, name);
-        const receipt = await tx.wait();
-        res.json({ success: true, transactionHash: receipt.transactionHash });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-
+    return totalBlockSize;
+}
 router.post('/vote-v2', async (req, res) => {
     const { candidateId } = req.body;
     try {
-        const startTime = Date.now();
+        const startTime = performance.now();
         const tx = await contract.vote(candidateId, { from: wallet.address });
         const receipt = await tx.wait();
         const voteCastLog = receipt.logs.find(
@@ -46,13 +37,18 @@ router.post('/vote-v2', async (req, res) => {
             name: args[1],
             voteCount: args[2].toString(),
         };
-        const endTime = Date.now();
-        const timeTaken = endTime - startTime;
         const block = await provider.getBlock(receipt.blockNumber);
-        const blockSize = Buffer.byteLength(JSON.stringify(block));
+        const manualGasPrice = 12n * 10n ** 9n;
+        const gasUsed = BigInt(receipt.gasUsed);
+        const gasPrice = manualGasPrice;
+        const transactionFee = gasUsed * gasPrice;
+        const blockSize = estimateBlockSize(BigInt(block.gasUsed), block.extraData);
+        const endTime = performance.now();
+        const timeTaken = endTime - startTime;
         res.json({
-            gasUsed: receipt.gasUsed.toString(),
-            blockSize,
+            gasUsed: gasUsed.toString(),
+            transactionFee: transactionFee.toString(),
+            blockSize: blockSize.toString(),
             timeTaken,
             updatedCandidate
         });
@@ -61,6 +57,8 @@ router.post('/vote-v2', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+
 
 
 

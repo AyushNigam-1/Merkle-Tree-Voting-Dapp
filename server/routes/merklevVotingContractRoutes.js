@@ -17,10 +17,19 @@ const contract = new ethers.Contract(contractAddress, abi, wallet);
 let voters = [];
 let merkleTree = new MerkleTree([], (value) => keccak("keccak256").update(value).digest());
 let merkleRoot = merkleTree.getRoot().toString("hex");
+function estimateBlockSize(gasUsed, extraDataHex) {
+    const BYTES_PER_GAS_UNIT = 16n;
+    const BLOCK_HEADER_SIZE = 500n;
 
+    const transactionDataSize = gasUsed / BYTES_PER_GAS_UNIT;
+    const extraDataSize = BigInt(extraDataHex.length / 2);
+    const totalBlockSize = BLOCK_HEADER_SIZE + transactionDataSize + extraDataSize;
+
+    return totalBlockSize;
+}
 router.post("/vote-v1", async (req, res) => {
     const { candidateId } = req.body;
-    const startTime = Date.now();
+    const startTime = performance.now();
     try {
         const voterAddress = ethers.getAddress(wallet.address);
         const leaf = `0x${keccak("keccak256")
@@ -56,14 +65,19 @@ router.post("/vote-v1", async (req, res) => {
             name: args[1],
             voteCount: args[2].toString(),
         };
-        const endTime = Date.now();
-        const timeTaken = endTime - startTime;
-        const block = await provider.getBlock(receipt.blockNumber);
-        const blockSize = Buffer.byteLength(JSON.stringify(block));
+        const block = await provider.getBlock(receipt.blockNumber, false);
+        const manualGasPrice = 12n * 10n ** 9n;
+        const gasUsed = BigInt(receipt.gasUsed);
+        const gasPrice = manualGasPrice;
+        const transactionFee = gasUsed * gasPrice;
+        const blockSize = estimateBlockSize(BigInt(block.gasUsed), block.extraData);
+        const endTime = performance.now()
+        const timeTaken = endTime - startTime
         res.json({
-            timeTaken,
-            gasUsed: receipt.gasUsed.toString(),
-            blockSize,
+            gasUsed: gasUsed.toString(),
+            transactionFee: transactionFee.toString(),
+            blockSize: blockSize.toString(),
+            timeTaken: timeTaken,
             updatedCandidate
         });
     } catch (error) {

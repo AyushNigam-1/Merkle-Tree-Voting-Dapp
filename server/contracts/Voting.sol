@@ -39,7 +39,7 @@ contract Voting {
     }
 
     function vote(uint candidateId) public {
-        require(!voters[msg.sender].hasVoted, "You have already voted.");
+        // require(!voters[msg.sender].hasVoted, "You have already voted.");
         require(
             candidateId > 0 && candidateId <= candidatesCount,
             "Invalid candidate ID."

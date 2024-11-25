@@ -9,6 +9,7 @@ const App = () => {
   const [timetaken, setTimeTaken] = useState([])
   const [gasUsed, setGasUsed] = useState([])
   const [size, setSize] = useState([])
+  const [transactionFee, setTransactionFee] = useState([])
   const [loader, setLoader] = useState(false)
   const [loader2, setLoader2] = useState(false)
   const getCandidates = async () => {
@@ -34,6 +35,7 @@ const App = () => {
       setTimeTaken((prev) => [...prev, estimates.timeTaken])
       setGasUsed((prev) => [...prev, estimates.gasUsed])
       setSize((prev) => [...prev, estimates.blockSize])
+      setTransactionFee((prev) => [...prev, estimates.transactionFee])
       setCandidatev1(estimates.updatedCandidate)
     } catch (error) {
       console.error("Error submitting vote:", error);
@@ -53,8 +55,10 @@ const App = () => {
       setTimeTaken((prev) => [...prev, estimates.timeTaken])
       setGasUsed((prev) => [...prev, estimates.gasUsed])
       setSize((prev) => [...prev, estimates.blockSize])
-      setCandidatev2(estimates.updatedCandidate)
+      setTransactionFee((prev) => [...prev, estimates.transactionFee])
 
+      setCandidatev2(estimates.updatedCandidate)
+      console.log(estimates)
     } catch (error) {
       console.error("Error submitting vote:", error);
     }
@@ -112,7 +116,7 @@ const App = () => {
           </div>
         </form>
       </div>
-      <Charts gasUsed={gasUsed} timetaken={timetaken} blocksize={size} />
+      <Charts gasUsed={gasUsed} timetaken={timetaken} blocksize={size} transactionFee={transactionFee} />
     </div>
   );
 };

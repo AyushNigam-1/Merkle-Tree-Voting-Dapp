@@ -51,7 +51,7 @@ contract MerkleVoting {
         bytes32[] calldata merkleProof,
         bytes32 newMerkleRoot
     ) public {
-        require(!hasVoted[msg.sender], "You have already voted.");
+        // require(!hasVoted[msg.sender], "You have already voted.");
         require(candidates[candidateId].id != 0, "Candidate does not exist.");
 
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
