@@ -53,19 +53,6 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             },
         ],
     };
-    const timeOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            title: {
-                display: true,
-                text: 'Time Taken in ms',
-            },
-        },
-    };
     const sizeOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -76,9 +63,36 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             title: {
                 display: true,
                 text: 'Block Size',
+                font: {
+                    size: 20,
+                    weight: 'bold',
+                },
+            },
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Contract Type',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Block Size (in Bytes)',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
             },
         },
     };
+
     const gasOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -89,9 +103,76 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             title: {
                 display: true,
                 text: 'Gas Used',
+                font: {
+                    size: 20,
+                    weight: 'bold',
+                },
+            },
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Contract Type',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Gas Used',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
             },
         },
     };
+
+    const timeOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            title: {
+                display: true,
+                text: 'Time Taken',
+                font: {
+                    size: 20,
+                    weight: 'bold',
+                },
+            },
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Contract Type',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Time Taken (in Ms)',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
+            },
+        },
+    };
+
     const feeOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -102,9 +183,38 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             title: {
                 display: true,
                 text: 'Transaction Fee',
+                font: {
+                    size: 20,
+                    weight: 'bold',
+                },
+            },
+        },
+        scales: {
+            x: {
+                title: {
+                    display: true,
+                    text: 'Contract Type',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Transaction Fee (in Wei)',
+                    font: {
+                        size: 16,
+                        weight: 'bold',
+                    },
+                },
             },
         },
     };
+
+
+
     return (
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '100px' }}>
