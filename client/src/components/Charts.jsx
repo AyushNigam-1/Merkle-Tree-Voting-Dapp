@@ -48,7 +48,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
         datasets: [
             {
                 label: 'Transaction Fee',
-                data: timetaken,
+                data: transactionFee,
                 backgroundColor: 'rgb(216, 191, 216)',
             },
         ],
@@ -107,8 +107,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
     };
     return (
 
-        <>
-
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '100px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: "80px" }}>
                 {timetaken?.length === 2 && (
                     <div style={{ width: "800px", height: "800px" }}> {/* Set desired container dimensions */}
@@ -134,7 +133,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
                     </div>
                 )}
             </div>
-        </>
+        </div>
     );
 
 }

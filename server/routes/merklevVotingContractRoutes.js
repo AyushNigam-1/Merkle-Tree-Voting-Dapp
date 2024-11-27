@@ -75,9 +75,9 @@ router.post("/vote-v1", async (req, res) => {
         const timeTaken = endTime - startTime
         res.json({
             gasUsed: gasUsed.toString(),
-            transactionFee: transactionFee.toString(),
-            blockSize: blockSize.toString(),
-            timeTaken: timeTaken,
+            transactionFee: Math.floor(Number(transactionFee.toString()) / Math.pow(10, Math.floor(Math.log10(Number(transactionFee.toString()))) - 6)),
+            blockSize: Number(blockSize.toString()),
+            timeTaken: Number(timeTaken.toPrecision(5)),
             updatedCandidate
         });
     } catch (error) {
