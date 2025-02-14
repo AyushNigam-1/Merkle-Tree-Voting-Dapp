@@ -4,8 +4,8 @@ const router = express.Router();
 const { abi } = require("../artifacts/contracts/Voting.sol/Voting.json")
 require("dotenv").config()
 
-const provider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER);
-const wallet = new ethers.Wallet(process.env.ETH_PRIVATE_KEY, provider);
+const provider = new ethers.JsonRpcProvider(process.env.POLYGON_ZKEVM_RPC_PROVIDER);
+const wallet = new ethers.Wallet(process.env.POLYGON_ZKEVM_PRIVATE_KEY, provider);
 
 const contractAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
@@ -19,7 +19,7 @@ function estimateBlockSize(gasUsed, extraDataHex) {
 
     return totalBlockSize;
 }
-router.post('/vote-v2', async (req, res) => {
+router.post('/vote-v3', async (req, res) => {
     const { candidateId } = req.body;
     try {
         const startTime = performance.now();

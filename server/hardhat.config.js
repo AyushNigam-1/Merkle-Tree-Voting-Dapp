@@ -18,6 +18,11 @@ task("clean", "Clean the artifacts, cache, and ignition deployment directories",
 module.exports = {
   solidity: "0.8.27",
   networks: {
+    polygon_zkevm: {
+      url: process.env.POLYGON_ZKEVM_RPC_PROVIDER,
+      accounts: [process.env.POLYGON_ZKEVM_PRIVATE_KEY],
+      chainId: 2442
+    },
     hardhat: {
       chainId: 1337,
     },
