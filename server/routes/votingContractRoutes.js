@@ -7,49 +7,53 @@ require("dotenv").config()
 const provider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER);
 const wallet = new ethers.Wallet(process.env.ETH_PRIVATE_KEY, provider);
 
-const contractAddress = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
+const contractAddress = '0x5CFF2e3CE6a831E20aF6fA0630B065dC0A6ccCBb';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
-function estimateBlockSize(gasUsed, extraDataHex) {
-    const BYTES_PER_GAS_UNIT = 16n;
-    const BLOCK_HEADER_SIZE = 500n;
+async function getBlockSize(blockNumber) {
+    const block = await provider.getBlock(blockNumber, true);
+    if (!block) throw new Error(`Block ${blockNumber} not found`);
 
-    const transactionDataSize = gasUsed / BYTES_PER_GAS_UNIT;
-    const extraDataSize = BigInt(extraDataHex.length / 2);
-    const totalBlockSize = BLOCK_HEADER_SIZE + transactionDataSize + extraDataSize;
+    let totalSize = 500 + (block.extraData.length / 2); // Base size + extra data
 
-    return totalBlockSize;
+    for (let tx of block.transactions) {
+        const txReceipt = await provider.getTransaction(tx.hash);
+        totalSize += txReceipt.data.length / 2; // Convert hex to bytes
+    }
+
+    return totalSize;
 }
+
 router.post('/vote-v2', async (req, res) => {
     const { candidateId } = req.body;
     try {
-        const startTime = performance.now();
+        const startTime = Date.now();
         const tx = await contract.vote(candidateId, { from: wallet.address });
         const receipt = await tx.wait();
-        const voteCastLog = receipt.logs.find(
-            log => log.fragment && log.fragment.name === "VoteCast"
-        );
-        if (!voteCastLog) {
-            throw new Error("VoteCast event not found in logs.");
-        }
+
+        const voteCastLog = receipt.logs.find(log => log.fragment && log.fragment.name === "VoteCast");
+        if (!voteCastLog) throw new Error("VoteCast event not found in logs.");
+
         const { args } = voteCastLog;
         const updatedCandidate = {
             id: args[0].toString(),
             name: args[1],
             voteCount: args[2].toString(),
         };
-        const block = await provider.getBlock(receipt.blockNumber);
-        const manualGasPrice = 12n * 10n ** 9n;
+
         const gasUsed = BigInt(receipt.gasUsed);
-        const gasPrice = manualGasPrice;
-        const transactionFee = gasUsed * gasPrice;
-        const blockSize = estimateBlockSize(BigInt(block.gasUsed), block.extraData);
-        const endTime = performance.now();
-        const timeTaken = endTime - startTime;
+        const feeData = await provider.getFeeData();
+        const gasPrice = feeData.gasPrice || await provider.getGasPrice();
+        const transactionFee = ethers.formatUnits(gasUsed * gasPrice, "gwei"); // Convert to gwei
+
+        const blockSize = await getBlockSize(receipt.blockNumber);
+        const endTime = Date.now();
+        const timeTaken = (endTime - startTime) / 1000; // Convert to seconds
+
         res.json({
-            gasUsed: Number(gasUsed.toString()) + 30000,
-            transactionFee: Math.floor(Number(transactionFee.toString()) / Math.pow(10, Math.floor(Math.log10(Number(transactionFee.toString()))) - 6)) + 1500000,
-            blockSize: Number(blockSize.toString()) + 4000,
-            timeTaken: Number(timeTaken.toPrecision(5)) + 4000,
+            gasUsed: Number(receipt.gasUsed),
+            transactionFee: Number(transactionFee), // Gwei
+            blockSize: (blockSize / 1024).toFixed(2), // Convert to KB
+            timeTaken: timeTaken.toFixed(3), // Seconds
             updatedCandidate
         });
     } catch (error) {
@@ -57,6 +61,7 @@ router.post('/vote-v2', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 router.get('/candidates-with-votes', async (req, res) => {
     try {

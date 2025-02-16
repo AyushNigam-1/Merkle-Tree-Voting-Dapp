@@ -6,18 +6,25 @@ import Charts from "./components/Charts";
 const App = () => {
   const [candidatev1, setCandidatev1] = useState("");
   const [candidatev2, setCandidatev2] = useState("");
+  const [candidatev3, setCandidatev3] = useState("");
+
   const [timetaken, setTimeTaken] = useState([])
   const [gasUsed, setGasUsed] = useState([])
   const [size, setSize] = useState([])
   const [transactionFee, setTransactionFee] = useState([])
   const [loader, setLoader] = useState(false)
   const [loader2, setLoader2] = useState(false)
+  const [loader3, setLoader3] = useState(false)
+
   const getCandidates = async () => {
     const candidatesV1 = await axios.get("http://localhost:3000/v1/candidate-votes")
     const candidatesV2 = await axios.get("http://localhost:3000/v2/candidates-with-votes")
+    const candidatesV3 = await axios.get("http://localhost:3000/v3/candidates-with-votes")
     setCandidatev1(candidatesV1.data.candidates[0])
     setCandidatev2(candidatesV2.data.candidates[0])
-    console.log(candidatesV1, candidatesV2)
+    setCandidatev3(candidatesV3.data.candidates[0])
+
+    console.log(candidatesV1, candidatesV2, candidatesV3)
   }
 
   useEffect(() => {
@@ -64,6 +71,28 @@ const App = () => {
     }
     finally {
       setLoader2(false)
+    }
+  };
+  const handleSubmitV3 = async (event) => {
+    event.preventDefault();
+    setLoader3(true)
+    try {
+      const response = await axios.post("http://localhost:3000/v3/vote-v3", {
+        candidateId: candidatev3.id
+      });
+      const estimates = response.data;
+      setTimeTaken((prev) => [...prev, estimates.timeTaken])
+      setGasUsed((prev) => [...prev, estimates.gasUsed])
+      setSize((prev) => [...prev, estimates.blockSize])
+      setTransactionFee((prev) => [...prev, estimates.transactionFee])
+
+      setCandidatev2(estimates.updatedCandidate)
+      console.log(estimates)
+    } catch (error) {
+      console.error("Error submitting vote:", error);
+    }
+    finally {
+      setLoader3(false)
     }
   };
   return (
@@ -113,6 +142,30 @@ const App = () => {
               display: 'flex',
               justifyContent: 'center'
             }} > {loader2 ? <img width="14" src="Half circle.gif" /> : "Vote"} </button>
+          </div>
+        </form>
+        <form onSubmit={handleSubmitV3} style={{ display: 'flex', flexDirection: 'column', gap: '4px', }}>
+          <h1>zkEvm Voting </h1>
+          <div style={{
+            backgroundColor: "rgb(255 201 201)", borderRadius: "10px", display: 'flex', justifyContent: 'center', flexDirection: 'column', alignItems: 'center', padding: '8px', gap: "10px"
+          }}  >
+            <h3 style={{ margin: '0px', fontSize: "24px" }}>{candidatev3.name}</h3>
+            <h1 style={{ margin: '0px', fontSize: '56px' }}>{candidatev3.voteCount}</h1>
+            <button type="submit" style={{
+              backgroundColor: "#fff",
+              color: "#333",
+              padding: "10px 20px",
+              border: "none",
+              borderRadius: "5px",
+              fontSize: "16px",
+              cursor: "pointer",
+              transition: "all 0.3s ease",
+              textAlign: "center",
+              fontWeight: 'bolder',
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center'
+            }} > {loader3 ? <img width="14" src="Half circle.gif" /> : "Vote"} </button>
           </div>
         </form>
       </div>

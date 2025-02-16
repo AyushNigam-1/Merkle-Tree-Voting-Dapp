@@ -18,10 +18,15 @@ task("clean", "Clean the artifacts, cache, and ignition deployment directories",
 module.exports = {
   solidity: "0.8.27",
   networks: {
-    polygon_zkevm: {
-      url: process.env.POLYGON_ZKEVM_RPC_PROVIDER,
-      accounts: [process.env.POLYGON_ZKEVM_PRIVATE_KEY],
-      chainId: 2442
+    zkTest: {
+      url: "https://rpc.testnet.immutable.com",
+      chainId: 13473,
+      accounts: ["0x3af0860959ac77e78ef9814f1b19962585fae66b5979ca1cb0edfeb3a423b6ca"]
+    },
+    ethTest: {
+      url: "https://1rpc.io/holesky",
+      chainId: 17000,
+      accounts: ["0x3af0860959ac77e78ef9814f1b19962585fae66b5979ca1cb0edfeb3a423b6ca"]
     },
     hardhat: {
       chainId: 1337,

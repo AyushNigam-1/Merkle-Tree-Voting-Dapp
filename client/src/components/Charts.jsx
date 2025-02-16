@@ -11,8 +11,9 @@ import {
 } from 'chart.js';
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
+    console.log(gasUsed, timetaken, blocksize, transactionFee)
     const size = {
-        labels: ['Merkle Tree Contract', 'Ordinary Contract'],
+        labels: ['Merkle Tree Contract', 'Ordinary Contract', 'zkEvm Contract'],
         datasets: [
             {
                 label: 'Block Size',
@@ -23,7 +24,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
     };
 
     const gas = {
-        labels: ['Merkle Tree Contract', 'Ordinary Contract'],
+        labels: ['Merkle Tree Contract', 'Ordinary Contract', 'zkEvm Contract'],
         datasets: [
             {
                 label: 'Gas Used',
@@ -34,7 +35,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
     };
 
     const time = {
-        labels: ['Merkle Tree Contract', 'Ordinary Contract'],
+        labels: ['Merkle Tree Contract', 'Ordinary Contract', 'zkEvm Contract'],
         datasets: [
             {
                 label: 'Time Taken',
@@ -44,7 +45,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
         ],
     };
     const fee = {
-        labels: ['Merkle Tree Contract', 'Ordinary Contract'],
+        labels: ['Merkle Tree Contract', 'Ordinary Contract', 'zkEvm Contract'],
         datasets: [
             {
                 label: 'Transaction Fee',
@@ -219,12 +220,12 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '100px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: "80px" }}>
-                {timetaken?.length === 2 && (
+                {timetaken?.length === 3 && (
                     <div style={{ width: "800px", height: "800px" }}> {/* Set desired container dimensions */}
                         <Bar data={time} options={timeOptions} />
                     </div>
                 )}
-                {blocksize?.length === 2 && (
+                {blocksize?.length === 3 && (
                     <div style={{ width: "800px", height: "800px" }}>
                         <Bar data={size} options={sizeOptions} />
                     </div>
@@ -232,12 +233,12 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: "80px" }}>
 
-                {gasUsed?.length === 2 && (
+                {gasUsed?.length === 3 && (
                     <div style={{ width: "800px", height: "800px" }}>
                         <Bar data={gas} options={gasOptions} />
                     </div>
                 )}
-                {transactionFee?.length === 2 && (
+                {transactionFee?.length === 3 && (
                     <div style={{ width: "800px", height: "800px" }}>
                         <Bar data={fee} options={feeOptions} />
                     </div>
