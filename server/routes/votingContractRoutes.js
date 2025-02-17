@@ -2,12 +2,14 @@ const express = require('express');
 const { ethers } = require('ethers');
 const router = express.Router();
 const { abi } = require("../artifacts/contracts/Voting.sol/Voting.json")
+const axios = require('axios')
+
 require("dotenv").config()
 
 const provider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER);
 const wallet = new ethers.Wallet(process.env.ETH_PRIVATE_KEY, provider);
 
-const contractAddress = '0x5CFF2e3CE6a831E20aF6fA0630B065dC0A6ccCBb';
+const contractAddress = '0x2Bfe345b7B39D6C045664F4b68A2d60d7abcedC4';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 async function getBlockSize(blockNumber) {
     const block = await provider.getBlock(blockNumber, true);
@@ -16,7 +18,7 @@ async function getBlockSize(blockNumber) {
     let totalSize = 500 + (block.extraData.length / 2); // Base size + extra data
 
     for (let tx of block.transactions) {
-        const txReceipt = await provider.getTransaction(tx.hash);
+        const txReceipt = await provider.getTransaction(tx);
         totalSize += txReceipt.data.length / 2; // Convert hex to bytes
     }
 
@@ -26,7 +28,7 @@ async function getBlockSize(blockNumber) {
 router.post('/vote-v2', async (req, res) => {
     const { candidateId } = req.body;
     try {
-        const startTime = Date.now();
+        const startTime = performance.now();
         const tx = await contract.vote(candidateId, { from: wallet.address });
         const receipt = await tx.wait();
 
@@ -43,17 +45,25 @@ router.post('/vote-v2', async (req, res) => {
         const gasUsed = BigInt(receipt.gasUsed);
         const feeData = await provider.getFeeData();
         const gasPrice = feeData.gasPrice || await provider.getGasPrice();
-        const transactionFee = ethers.formatUnits(gasUsed * gasPrice, "gwei"); // Convert to gwei
+        const transactionFeeWei = gasUsed * gasPrice;
+        // const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether"); // Convert to ETH
+        const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
+        const ethToUsdRate = response.data["ethereum"].usd;
 
+        // Convert transaction fee in Wei to ETH
+        const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether");
+
+        // Convert transaction fee in ETH to USD
+        const transactionFee = parseFloat(transactionFeeETH) * ethToUsdRate;
         const blockSize = await getBlockSize(receipt.blockNumber);
-        const endTime = Date.now();
-        const timeTaken = (endTime - startTime) / 1000; // Convert to seconds
+        const endTime = performance.now();
+        const timeTaken = (endTime - startTime) / 1000; // Convert ms to seconds
 
         res.json({
             gasUsed: Number(receipt.gasUsed),
-            transactionFee: Number(transactionFee), // Gwei
-            blockSize: (blockSize / 1024).toFixed(2), // Convert to KB
-            timeTaken: timeTaken.toFixed(3), // Seconds
+            transactionFee: transactionFee.toFixed(4), // Also return in wei
+            blockSize: Number((blockSize / 1024).toFixed(2)), // Convert to KB
+            timeTaken: Number(timeTaken.toFixed(3)), // Time in seconds
             updatedCandidate
         });
     } catch (error) {
@@ -81,3 +91,5 @@ router.get('/candidates-with-votes', async (req, res) => {
 
 
 module.exports = router;
+
+

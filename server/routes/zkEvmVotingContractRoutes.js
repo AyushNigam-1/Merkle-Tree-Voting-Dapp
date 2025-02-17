@@ -2,36 +2,37 @@ const express = require('express');
 const { ethers } = require('ethers');
 const router = express.Router();
 const { abi } = require("../artifacts/contracts/Voting.sol/Voting.json")
+const axios = require('axios')
 require("dotenv").config()
 
 const provider = new ethers.JsonRpcProvider(process.env.IMMUTABLE_ZKEVM_RPC_PROVIDER);
 const wallet = new ethers.Wallet(process.env.IMMUTABLE_ZKEVM_PRIVATE_KEY, provider);
 
-const contractAddress = '0xe94531e5705d3E34a4003f7cB04EE8C24D6Cc2E9';
+const contractAddress = '0xC5Fc3DCCcAf6caaD1602717F46a7E7086921dC33';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
+
 async function getBlockSize(blockNumber) {
-    const block = await provider.getBlock(blockNumber, true);
+    const block = await provider.send("eth_getBlockByNumber", [
+        ethers.toQuantity(blockNumber),
+        false,
+    ]);
+
     if (!block) throw new Error(`Block ${blockNumber} not found`);
 
-    let totalSize = 500 + (block.extraData.length / 2);
-
-    for (let tx of block.transactions) {
-        const txReceipt = await provider.getTransaction(tx.hash);
-        totalSize += txReceipt.data.length / 2;
-    }
-
-    return totalSize;
+    return parseInt(block.size, 16) || "Unknown size";
 }
 router.post('/vote-v3', async (req, res) => {
     const { candidateId } = req.body;
     try {
-        const startTime = Date.now();
-        const tx = await contract.vote(candidateId, { from: wallet.address });
+        const startTime = performance.now();
+        const tx = await contract.vote(candidateId);
         const receipt = await tx.wait();
-
-        const voteCastLog = receipt.logs.find(log => log.fragment && log.fragment.name === "VoteCast");
-        if (!voteCastLog) throw new Error("VoteCast event not found in logs.");
-
+        const voteCastLog = receipt.logs.find(
+            log => log.fragment && log.fragment.name === "VoteCast"
+        );
+        if (!voteCastLog) {
+            throw new Error("VoteCast event not found in logs.");
+        }
         const { args } = voteCastLog;
         const updatedCandidate = {
             id: args[0].toString(),
@@ -41,18 +42,33 @@ router.post('/vote-v3', async (req, res) => {
 
         const gasUsed = BigInt(receipt.gasUsed);
         const feeData = await provider.getFeeData();
-        const gasPrice = feeData.gasPrice || await provider.getGasPrice();
-        const transactionFee = ethers.formatUnits(gasUsed * gasPrice, "gwei"); // Convert to gwei
+        let gasPrice = feeData.gasPrice || await provider.getGasPrice();
+
+        // Ensure gasPrice is in Wei
+        if (gasPrice) {
+            gasPrice = ethers.BigNumber.from(gasPrice).mul(ethers.BigNumber.from("1000000000")); // Convert Gwei to Wei
+        } else {
+            throw new Error("Unable to fetch gas price.");
+        }
+
+        const transactionFeeIMX = gasUsed * gasPrice;
+
+        // Fetch IMX to USD rate
+        const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=immutable-x&vs_currencies=usd");
+        const imxToUsdRate = response.data["immutable-x"].usd;
+
+        // Convert transaction fee in IMX to USD
+        const transactionFee = Number(transactionFeeIMX) * imxToUsdRate;
 
         const blockSize = await getBlockSize(receipt.blockNumber);
-        const endTime = Date.now();
-        const timeTaken = (endTime - startTime) / 1000; // Convert to seconds
+        const endTime = performance.now();
+        const timeTaken = (endTime - startTime) / 1000;
 
         res.json({
             gasUsed: Number(receipt.gasUsed),
-            transactionFee: Number(transactionFee), // Now in gwei
-            blockSize: (blockSize / 1024).toFixed(2), // Convert to KB
-            timeTaken: timeTaken.toFixed(3), // Convert to seconds
+            transactionFee: transactionFee.toFixed(4), // Fee in wei // Fee in IMX
+            blockSize: Number((blockSize / 1024).toFixed(2)), // Convert to KB
+            timeTaken: Number(timeTaken.toFixed(3)), // Time in seconds
             updatedCandidate
         });
     } catch (error) {
@@ -60,6 +76,7 @@ router.post('/vote-v3', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 router.get('/candidates-with-votes', async (req, res) => {
     try {
@@ -76,5 +93,6 @@ router.get('/candidates-with-votes', async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
 
 module.exports = router;

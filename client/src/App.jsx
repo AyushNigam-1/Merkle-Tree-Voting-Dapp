@@ -39,6 +39,7 @@ const App = () => {
         candidateId: candidatev1.id
       });
       const estimates = response.data;
+      console.log(estimates)
       setTimeTaken((prev) => [...prev, estimates.timeTaken])
       setGasUsed((prev) => [...prev, estimates.gasUsed])
       setSize((prev) => [...prev, estimates.blockSize])
