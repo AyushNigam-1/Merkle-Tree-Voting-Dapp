@@ -84,7 +84,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             y: {
                 title: {
                     display: true,
-                    text: 'Block Size (in Bytes)',
+                    text: 'Block Size (in Kb)',
                     font: {
                         size: 16,
                         weight: 'bold',
@@ -124,7 +124,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             y: {
                 title: {
                     display: true,
-                    text: 'Gas Used',
+                    text: 'Gas Used (in Wei)',
                     font: {
                         size: 16,
                         weight: 'bold',
@@ -164,7 +164,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             y: {
                 title: {
                     display: true,
-                    text: 'Time Taken (in Ms)',
+                    text: 'Time Taken (in Seconds)',
                     font: {
                         size: 16,
                         weight: 'bold',
@@ -204,7 +204,7 @@ const Charts = ({ gasUsed, timetaken, blocksize, transactionFee }) => {
             y: {
                 title: {
                     display: true,
-                    text: 'Transaction Fee (in Wei)',
+                    text: 'Transaction Fee (in Usd)',
                     font: {
                         size: 16,
                         weight: 'bold',

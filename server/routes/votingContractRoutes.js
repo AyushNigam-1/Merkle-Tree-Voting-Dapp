@@ -9,29 +9,23 @@ require("dotenv").config()
 const provider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER);
 const wallet = new ethers.Wallet(process.env.ETH_PRIVATE_KEY, provider);
 
-const contractAddress = '0x2Bfe345b7B39D6C045664F4b68A2d60d7abcedC4';
+const contractAddress = '0x8dA4D5732A7253e383053Fa3c372024f70360F90';
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 async function getBlockSize(blockNumber) {
-    const block = await provider.getBlock(blockNumber, true);
-    if (!block) throw new Error(`Block ${blockNumber} not found`);
-
-    let totalSize = 500 + (block.extraData.length / 2); // Base size + extra data
-
-    for (let tx of block.transactions) {
-        const txReceipt = await provider.getTransaction(tx);
-        totalSize += txReceipt.data.length / 2; // Convert hex to bytes
-    }
-
-    return totalSize;
+    const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
+    const blockSize = Number(block.size); // Direct size in bytes
+    return blockSize;
 }
 
 router.post('/vote-v2', async (req, res) => {
+
     const { candidateId } = req.body;
     try {
         const startTime = performance.now();
         const tx = await contract.vote(candidateId, { from: wallet.address });
         const receipt = await tx.wait();
-
+        const endTime = performance.now();
+        const timeTaken = (endTime - startTime) / 1000; // Convert ms to seconds
         const voteCastLog = receipt.logs.find(log => log.fragment && log.fragment.name === "VoteCast");
         if (!voteCastLog) throw new Error("VoteCast event not found in logs.");
 
@@ -44,7 +38,15 @@ router.post('/vote-v2', async (req, res) => {
 
         const gasUsed = BigInt(receipt.gasUsed);
         const feeData = await provider.getFeeData();
-        const gasPrice = feeData.gasPrice || await provider.getGasPrice();
+
+        let gasPrice;
+        if (receipt.effectiveGasPrice) {
+            gasPrice = receipt.effectiveGasPrice;
+        } else {
+            gasPrice = feeData.gasPrice || await provider.getGasPrice();
+        }
+
+        // Compute the actual transaction fee
         const transactionFeeWei = gasUsed * gasPrice;
         // const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether"); // Convert to ETH
         const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
@@ -56,8 +58,7 @@ router.post('/vote-v2', async (req, res) => {
         // Convert transaction fee in ETH to USD
         const transactionFee = parseFloat(transactionFeeETH) * ethToUsdRate;
         const blockSize = await getBlockSize(receipt.blockNumber);
-        const endTime = performance.now();
-        const timeTaken = (endTime - startTime) / 1000; // Convert ms to seconds
+
 
         res.json({
             gasUsed: Number(receipt.gasUsed),

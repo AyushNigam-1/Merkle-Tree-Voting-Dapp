@@ -87,7 +87,7 @@ const App = () => {
       setSize((prev) => [...prev, estimates.blockSize])
       setTransactionFee((prev) => [...prev, estimates.transactionFee])
 
-      setCandidatev2(estimates.updatedCandidate)
+      setCandidatev3(estimates.updatedCandidate)
       console.log(estimates)
     } catch (error) {
       console.error("Error submitting vote:", error);

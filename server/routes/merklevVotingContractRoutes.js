@@ -12,35 +12,17 @@ const router = express();
 
 const provider = new ethers.JsonRpcProvider(process.env.ETH_PROVIDER);
 const wallet = new ethers.Wallet(process.env.ETH_PRIVATE_KEY, provider);
-const contractAddress = "0x6858763aCf4F344c38aDBb506A65eF509799b420";
+const contractAddress = "0x69A78592B1C0d6699eb30ea05A1b1e0420E5E468";
 const contract = new ethers.Contract(contractAddress, abi, wallet);
 
 let voters = [];
 let merkleTree = new MerkleTree([], (value) => keccak("keccak256").update(value).digest());
 let merkleRoot = merkleTree.getRoot().toString("hex");
-function estimateBlockSize(gasUsed, extraDataHex) {
-    const BYTES_PER_GAS_UNIT = 16n;
-    const BLOCK_HEADER_SIZE = 500n;
-
-    const transactionDataSize = gasUsed / BYTES_PER_GAS_UNIT;
-    const extraDataSize = BigInt(extraDataHex.length / 2);
-    const totalBlockSize = BLOCK_HEADER_SIZE + transactionDataSize + extraDataSize;
-
-    return totalBlockSize;
-}
 
 async function getBlockSize(blockNumber) {
-    const block = await provider.getBlock(blockNumber, true);
-    if (!block) throw new Error(`Block ${blockNumber} not found`);
-
-    let totalSize = 500 + (block.extraData.length / 2); // Base size + extra data
-
-    for (let tx of block.transactions) {
-        const txReceipt = await provider.getTransaction(tx);
-        totalSize += txReceipt.data.length / 2; // Convert hex to bytes
-    }
-
-    return totalSize;
+    const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
+    const blockSize = Number(block.size); // Direct size in bytes
+    return blockSize;
 }
 
 router.post("/vote-v1", async (req, res) => {
@@ -69,6 +51,8 @@ router.post("/vote-v1", async (req, res) => {
         const merkleProof = proof.map(proof => `0x${proof.data.toString("hex")}`);
         const tx = await contract.vote(candidateId, merkleProof, merkleRoot);
         const receipt = await tx.wait();
+        const endTime = performance.now();
+        const timeTaken = (endTime - startTime) / 1000;
         const voteCastLog = receipt.logs.find(
             log => log.fragment && log.fragment.name === "VoteCast"
         );
@@ -83,8 +67,15 @@ router.post("/vote-v1", async (req, res) => {
         };
         const gasUsed = BigInt(receipt.gasUsed);
         const feeData = await provider.getFeeData();
-        const gasPrice = feeData.gasPrice || await provider.getGasPrice();
+
+        let gasPrice;
+        if (receipt.effectiveGasPrice) {
+            gasPrice = receipt.effectiveGasPrice;
+        } else {
+            gasPrice = feeData.gasPrice || await provider.getGasPrice();
+        }
         const transactionFeeWei = gasUsed * gasPrice;
+
         // const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether"); // Convert to ETH
         const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
         const ethToUsdRate = response.data["ethereum"].usd;
@@ -96,8 +87,7 @@ router.post("/vote-v1", async (req, res) => {
         const transactionFee = parseFloat(transactionFeeETH) * ethToUsdRate;
         console.log(transactionFee)
         const blockSize = await getBlockSize(receipt.blockNumber);
-        const endTime = performance.now();
-        const timeTaken = (endTime - startTime) / 1000; // Convert ms to seconds
+        // Convert ms to seconds
 
         res.json({
             gasUsed: Number(receipt.gasUsed),
