@@ -1,12 +1,11 @@
 const express = require("express");
 const { ethers } = require("ethers");
 const { MerkleTree } = require("merkletreejs");
-const { abi } = require("../artifacts/contracts/MerkleVoting.sol/MerkleVoting.json")
+const { abi } = require("../artifacts/contracts/MerkleVoting.sol/MerkleVoting.json");
 const keccak = require('keccak');
-const axios = require('axios')
+const axios = require('axios');
 
-require("dotenv").config()
-
+require("dotenv").config();
 
 const router = express();
 
@@ -21,24 +20,25 @@ let merkleRoot = merkleTree.getRoot().toString("hex");
 
 async function getBlockSize(blockNumber) {
     const block = await provider.send("eth_getBlockByNumber", [ethers.toBeHex(blockNumber), false]);
-    const blockSize = Number(block.size); // Direct size in bytes
+    const blockSize = Number(block.size);
+    console.log(`Block size: ${blockSize} bytes`);
     return blockSize;
 }
 
 router.post("/vote-v1", async (req, res) => {
     const { candidateId } = req.body;
+    console.log(`Received vote request for candidate ID: ${candidateId}`);
     const startTime = performance.now();
     try {
         const voterAddress = ethers.getAddress(wallet.address);
-        const leaf = `0x${keccak("keccak256")
-            .update(Buffer.from(voterAddress.slice(2), "hex"))
-            .digest("hex")}`;
+        console.log(`Voter address: ${voterAddress}`);
+
+        const leaf = `0x${keccak("keccak256").update(Buffer.from(voterAddress.slice(2), "hex")).digest("hex")}`;
         if (!voters.includes(voterAddress)) {
             voters.push(voterAddress);
+            console.log("Updating Merkle tree with new voter");
             const leafNodes = voters.map(voter =>
-                `0x${keccak("keccak256")
-                    .update(Buffer.from(voter.slice(2), "hex"))
-                    .digest("hex")}`
+                `0x${keccak("keccak256").update(Buffer.from(voter.slice(2), "hex")).digest("hex")}`
             );
             merkleTree = new MerkleTree(
                 leafNodes.map(x => Buffer.from(x.slice(2), "hex")),
@@ -46,13 +46,19 @@ router.post("/vote-v1", async (req, res) => {
                 { sortPairs: true }
             );
             merkleRoot = `0x${merkleTree.getRoot().toString("hex")}`;
+            console.log(`New Merkle Root: ${merkleRoot}`);
         }
         const proof = merkleTree.getProof(Buffer.from(leaf.slice(2), "hex"));
         const merkleProof = proof.map(proof => `0x${proof.data.toString("hex")}`);
+
+        console.log("Sending vote transaction...");
         const tx = await contract.vote(candidateId, merkleProof, merkleRoot);
         const receipt = await tx.wait();
+        console.log(`Transaction successful. Block number: ${receipt.blockNumber}`);
+
         const endTime = performance.now();
         const timeTaken = (endTime - startTime) / 1000;
+
         const voteCastLog = receipt.logs.find(
             log => log.fragment && log.fragment.name === "VoteCast"
         );
@@ -65,6 +71,9 @@ router.post("/vote-v1", async (req, res) => {
             name: args[1],
             voteCount: args[2].toString(),
         };
+
+        console.log(`Vote recorded for candidate: ${updatedCandidate.name}`);
+
         const gasUsed = BigInt(receipt.gasUsed);
         const feeData = await provider.getFeeData();
 
@@ -76,24 +85,20 @@ router.post("/vote-v1", async (req, res) => {
         }
         const transactionFeeWei = gasUsed * gasPrice;
 
-        // const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether"); // Convert to ETH
         const response = await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd");
         const ethToUsdRate = response.data["ethereum"].usd;
-
-        // Convert transaction fee in Wei to ETH
         const transactionFeeETH = ethers.formatUnits(transactionFeeWei, "ether");
-
-        // Convert transaction fee in ETH to USD
         const transactionFee = parseFloat(transactionFeeETH) * ethToUsdRate;
-        console.log(transactionFee)
+
+        console.log(`Transaction Fee: ${transactionFee.toFixed(4)} USD`);
+
         const blockSize = await getBlockSize(receipt.blockNumber);
-        // Convert ms to seconds
 
         res.json({
             gasUsed: Number(receipt.gasUsed),
-            transactionFee: transactionFee.toFixed(4), // Also return in wei
-            blockSize: Number((blockSize / 1024).toFixed(2)), // Convert to KB
-            timeTaken: Number(timeTaken.toFixed(3)), // Time in seconds
+            transactionFee: transactionFee.toFixed(4),
+            blockSize: Number((blockSize / 1024).toFixed(2)),
+            timeTaken: Number(timeTaken.toFixed(3)),
             updatedCandidate
         });
     } catch (error) {
@@ -107,6 +112,7 @@ router.post("/vote-v1", async (req, res) => {
 
 router.get("/candidate-votes", async (req, res) => {
     try {
+        console.log("Fetching candidate votes...");
         const [ids, names, voteCounts] = await contract.getAllCandidatesDetails();
 
         const candidatesWithVotes = ids.map((id, index) => ({
@@ -115,6 +121,7 @@ router.get("/candidate-votes", async (req, res) => {
             voteCount: voteCounts[index].toString(),
         }));
 
+        console.log("Candidates fetched successfully.");
         res.json({ candidates: candidatesWithVotes });
     } catch (error) {
         console.error("Error fetching candidates and votes:", error);
@@ -125,8 +132,4 @@ router.get("/candidate-votes", async (req, res) => {
     }
 });
 
-
-
-
-
-module.exports = router
+module.exports = router;

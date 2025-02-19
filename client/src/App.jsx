@@ -12,18 +12,20 @@ const App = () => {
   const [gasUsed, setGasUsed] = useState([])
   const [size, setSize] = useState([])
   const [transactionFee, setTransactionFee] = useState([])
+  const [mainLoader, setMainLoader] = useState(false)
   const [loader, setLoader] = useState(false)
   const [loader2, setLoader2] = useState(false)
   const [loader3, setLoader3] = useState(false)
 
   const getCandidates = async () => {
+    setMainLoader(true)
     const candidatesV1 = await axios.get("http://localhost:3000/v1/candidate-votes")
     const candidatesV2 = await axios.get("http://localhost:3000/v2/candidates-with-votes")
     const candidatesV3 = await axios.get("http://localhost:3000/v3/candidates-with-votes")
     setCandidatev1(candidatesV1.data.candidates[0])
     setCandidatev2(candidatesV2.data.candidates[0])
     setCandidatev3(candidatesV3.data.candidates[0])
-
+    setMainLoader(false)
     console.log(candidatesV1, candidatesV2, candidatesV3)
   }
 
@@ -96,9 +98,12 @@ const App = () => {
       setLoader3(false)
     }
   };
+  if (mainLoader) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><img width="24" src="Half circle.gif" /></div>
+  }
   return (
-    <div>
-      <div style={{ height: "100vh", width: "100vw", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px' }}>
+    <div style={{ overflowX: 'hidden' }}>
+      <div style={{ height: "100vh", width: "100vw", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px', overflowX: 'hidden' }}>
         <form onSubmit={handleSubmitV1} style={{ display: 'flex', flexDirection: 'column', gap: '4px', }}>
           <h1> Merkle Tree Voting</h1>
           <div style={{
